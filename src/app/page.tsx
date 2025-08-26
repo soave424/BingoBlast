@@ -9,7 +9,7 @@ import { ResultScreen } from '@/components/screens/ResultScreen';
 import { useToast } from '@/hooks/use-toast';
 import { generateFeedback } from '@/app/actions';
 import type { FeedbackInput } from '@/ai/flows/positive-feedback';
-import { createRoom, joinRoom, getGame, submitBoard, startGame, callWord, setTurn } from '@/app/game-actions';
+import { createRoom, joinRoom, getGame, submitBoard, startGame, callWord, setTurn, requestWordApproval, resolveWordRequest } from '@/app/game-actions';
 
 // Generate a unique session ID for the user
 const getSessionId = () => {
@@ -32,7 +32,10 @@ export default function Home() {
   const { toast } = useToast();
 
   useEffect(() => {
-    setUserId(getSessionId());
+    const id = getSessionId();
+    setUserId(id);
+    const savedIsHost = sessionStorage.getItem('isHost');
+    setIsHost(savedIsHost === 'true');
   }, []);
   
   const handleGameUpdate = useCallback((newGame: Game | null) => {
@@ -50,11 +53,11 @@ export default function Home() {
 
   // Polling for game updates
   useEffect(() => {
-    if (!game?.id) return;
+    if (!game?.id || game.status === 'finished') return;
     
     const interval = setInterval(async () => {
       const updatedGame = await getGame(game.id);
-      if (JSON.stringify(updatedGame) !== JSON.stringify(game)) {
+      if (updatedGame && JSON.stringify(updatedGame) !== JSON.stringify(game)) {
         setGame(updatedGame);
       }
     }, 2000); // Poll every 2 seconds
@@ -71,7 +74,9 @@ export default function Home() {
     randomWords: string[]
   ) => {
     const hostId = userId;
-    const hostNickname = '호스트';
+    // For hosts, let's use a fixed nickname or one they can set. Here, '호스트' is used.
+    // In a real app, you might have a nickname input for the host too.
+    const hostNickname = '호스트'; 
     
     const newGame = await createRoom({
       hostId,
@@ -86,6 +91,7 @@ export default function Home() {
 
     if (newGame) {
       setIsHost(true);
+      sessionStorage.setItem('isHost', 'true');
       handleGameUpdate(newGame);
     } else {
       toast({ variant: 'destructive', title: '오류', description: '방을 만들지 못했습니다.'});
@@ -95,24 +101,22 @@ export default function Home() {
   const handleJoinRoom = async (roomCode: string, nickname: string) => {
     if (!userId) return;
 
-    const updatedGame = await joinRoom(roomCode, userId, nickname);
-    if(updatedGame) {
-        if(updatedGame.error) {
-             toast({ variant: "destructive", title: "오류", description: updatedGame.error });
-        } else {
-            setIsHost(false);
-            handleGameUpdate(updatedGame.game);
-        }
+    const result = await joinRoom(roomCode, userId, nickname);
+    if(result.error) {
+        toast({ variant: "destructive", title: "오류", description: result.error });
     } else {
-        toast({ variant: "destructive", title: "오류", description: "방에 참여할 수 없습니다." });
+        setIsHost(false);
+        sessionStorage.setItem('isHost', 'false');
+        handleGameUpdate(result.game);
     }
   };
 
   const handleSubmitBoard = async (board: string[]) => {
     if (!game || !userId) return;
     
-    const uniqueWords = new Set(board.map(cell => cell.trim()));
-    if (uniqueWords.size !== board.length) {
+    const trimmedBoard = board.map(cell => cell.trim().toLowerCase()).filter(Boolean);
+    const uniqueWords = new Set(trimmedBoard);
+    if (uniqueWords.size !== trimmedBoard.length) {
       toast({
         variant: "destructive",
         title: "오류",
@@ -148,7 +152,7 @@ export default function Home() {
     if (!game || !userId) return;
 
     // Get feedback for the player whose turn just ended.
-    const playerIds = Object.keys(game.players);
+    const playerIds = Object.keys(game.players).filter(id => id !== game.hostId);
     let prevPlayerId = game.turn!;
     if (game.calledWords.length > 0) {
         const currentIndex = playerIds.indexOf(game.turn!);
@@ -170,7 +174,7 @@ export default function Home() {
       bingoCount: prevPlayer.bingoCount,
       isWinner: prevPlayer.isWinner,
       calledWord: calledWord,
-      remainingPlayers: Object.keys(game.players).length - game.winners.length,
+      remainingPlayers: Object.keys(game.players).length - 1 - game.winners.length,
       winCondition: game.winCondition,
     };
     
@@ -184,12 +188,30 @@ export default function Home() {
     handleGameUpdate(updatedGame);
   }
 
+  const handleRequestWordApproval = async (word: string, index: number) => {
+    if (!game || !userId) return;
+    const result = await requestWordApproval(game.id, userId, word, index);
+    if (result.error) {
+      toast({ variant: 'destructive', title: '오류', description: result.error });
+    } else {
+      toast({ title: '성공', description: `'${word}' 단어의 인정을 호스트에게 요청했습니다.` });
+      handleGameUpdate(result.game);
+    }
+  };
+
+  const handleResolveWordRequest = async (requestId: string, approve: boolean) => {
+    if (!game || !isHost) return;
+    const updatedGame = await resolveWordRequest(game.id, requestId, approve);
+    handleGameUpdate(updatedGame);
+  };
+
   const handleBackToHome = () => {
     setGame(null);
     setIsHost(false);
     setCoachFeedback(null);
     if (typeof window !== 'undefined') {
       sessionStorage.removeItem('bingoSessionId');
+      sessionStorage.removeItem('isHost');
       setUserId(getSessionId());
     }
   }
@@ -209,7 +231,9 @@ export default function Home() {
                   onCallWord={handleCallWord} 
                   onSetTurn={handleSetTurn}
                   coachFeedback={coachFeedback}
-                  onGetCoachFeedback={handleGetCoachFeedback} 
+                  onGetCoachFeedback={handleGetCoachFeedback}
+                  onRequestWordApproval={handleRequestWordApproval}
+                  onResolveWordRequest={handleResolveWordRequest}
                 />;
       case 'finished':
         return <ResultScreen game={game} onBackToHome={handleBackToHome} />;

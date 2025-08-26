@@ -71,7 +71,13 @@ function PlayerSetup({ game, userId, onSubmitBoard }: { game: Game; userId: stri
             <CardDescription>다른 플레이어들을 기다리고 있습니다.</CardDescription>
           </CardHeader>
           <CardContent>
-              <BingoBoard size={game.size} board={me.board} marked={me.marked} isInteractive={false} />
+              <BingoBoard 
+                size={game.size} 
+                board={me.board} 
+                marked={me.marked} 
+                isInteractive={false} 
+                playerId={me.id} 
+                currentUserId={userId} />
           </CardContent>
         </Card>
       );
@@ -107,7 +113,9 @@ export function WaitingScreen({ game, userId, isHost, onSubmitBoard, onStartGame
   const { toast } = useToast();
   const players = Object.values(game.players);
   const me = game.players[userId];
-  const allPlayersReady = useMemo(() => players.every(p => p.isReady), [players]);
+  const allPlayersReady = useMemo(() => players.filter(p => p.id !== game.hostId).every(p => p.isReady), [players, game.hostId]);
+  const guestPlayerCount = useMemo(() => players.filter(p => p.id !== game.hostId).length, [players, game.hostId]);
+
 
   const copyRoomCode = () => {
     navigator.clipboard.writeText(game.roomCode);
@@ -132,23 +140,26 @@ export function WaitingScreen({ game, userId, isHost, onSubmitBoard, onStartGame
       <div className="grid md:grid-cols-3 gap-6">
         <Card className="md:col-span-1">
           <CardHeader>
-            <CardTitle>참가자 목록 ({players.length}명)</CardTitle>
+            <CardTitle>참가자 목록 ({guestPlayerCount}명)</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {players.map(player => (
+            {players.filter(p => p.id !== game.hostId).map(player => (
               <div key={player.id} className="flex items-center justify-between p-3 bg-secondary rounded-lg">
                 <div className="flex items-center gap-2 font-semibold">
-                  {player.id === game.hostId ? <Crown className="w-5 h-5 text-primary" /> : <User className="w-5 h-5" />}
+                   <User className="w-5 h-5" />
                   <span>{player.nickname}</span>
                 </div>
                 {player.isReady ? <CheckCircle2 className="w-5 h-5 text-green-500" /> : <Badge variant="outline">준비 중</Badge>}
               </div>
             ))}
+             {players.length <= 1 && (
+                <p className="text-sm text-center text-muted-foreground pt-4">아직 참여한 친구가 없습니다.</p>
+            )}
           </CardContent>
         </Card>
         
         <div className="md:col-span-2 space-y-4">
-           <PlayerSetup game={game} userId={userId} onSubmitBoard={onSubmitBoard} />
+           {!isHost && me && <PlayerSetup game={game} userId={userId} onSubmitBoard={onSubmitBoard} />}
 
           {isHost && (
             <Card>
@@ -158,14 +169,14 @@ export function WaitingScreen({ game, userId, isHost, onSubmitBoard, onStartGame
               <CardContent>
                 <Button 
                   onClick={onStartGame} 
-                  disabled={!allPlayersReady || players.length < 1}
+                  disabled={!allPlayersReady || guestPlayerCount < 1}
                   className="w-full text-lg py-6"
                 >
                   게임 시작
                 </Button>
-                {(!allPlayersReady || players.length < 1) && (
+                {(!allPlayersReady || guestPlayerCount < 1) && (
                   <p className="text-sm text-muted-foreground mt-2 text-center">
-                    {players.length < 1 ? "혼자서는 플레이할 수 없습니다." : "모든 참가자가 준비를 마쳐야 합니다."}
+                    {guestPlayerCount < 1 ? "최소 1명 이상의 참가자가 있어야 시작할 수 있습니다." : "모든 참가자가 준비를 마쳐야 합니다."}
                   </p>
                 )}
               </CardContent>

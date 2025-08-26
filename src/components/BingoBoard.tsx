@@ -10,8 +10,11 @@ interface BingoBoardProps {
   isMyTurn?: boolean;
   isHost?: boolean;
   onCellClick?: (word: string, index: number) => void;
+  onRequestApproval?: (word: string, index: number) => void;
   className?: string;
   isInteractive: boolean;
+  playerId: string;
+  currentUserId: string;
 }
 
 export const BingoBoard: FC<BingoBoardProps> = ({
@@ -19,10 +22,14 @@ export const BingoBoard: FC<BingoBoardProps> = ({
   board,
   marked,
   onCellClick,
+  onRequestApproval,
   className,
   isInteractive,
+  playerId,
+  currentUserId,
 }) => {
   const bingoLines = checkBingo(marked, size);
+  const isMyBoard = playerId === currentUserId;
 
   return (
     <div className={cn('relative aspect-square', className)}>
@@ -32,17 +39,35 @@ export const BingoBoard: FC<BingoBoardProps> = ({
       >
         {board.map((word, i) => {
           const isMarked = marked[i];
-          const canClick = isInteractive && !isMarked && onCellClick;
+          const canCallWord = isInteractive && isMyBoard && !isMarked && onCellClick;
+          const canRequestApproval = isInteractive && isMyBoard && !isMyTurn && !isMarked && onRequestApproval;
+          
+          const handleClick = () => {
+            if (canCallWord) {
+              onCellClick(word, i);
+            } else if (canRequestApproval) {
+              onRequestApproval(word, i);
+            }
+          };
+
+          const getTitle = () => {
+            if (canCallWord) return `'${word}' 발표하기`;
+            if (canRequestApproval) return `'${word}' 인정 요청하기`;
+            return word;
+          }
+
           return (
             <div
               key={i}
-              onClick={() => canClick && onCellClick(word, i)}
+              onClick={handleClick}
               className={cn(
                 'bingo-cell aspect-square flex items-center justify-center p-1 rounded-md text-center text-xs sm:text-sm md:text-base break-words transition-all duration-300',
                 isMarked ? 'marked' : 'bg-secondary',
-                canClick && 'cursor-pointer hover:bg-primary/20 transform hover:scale-105'
+                (canCallWord || canRequestApproval) && 'cursor-pointer transform hover:scale-105',
+                canCallWord && 'hover:bg-primary/20',
+                canRequestApproval && 'hover:bg-accent/20'
               )}
-              title={word}
+              title={getTitle()}
             >
               <span className={cn(isMarked && 'opacity-0')}>{word}</span>
             </div>

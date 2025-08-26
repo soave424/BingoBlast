@@ -10,6 +10,14 @@ export interface Player {
 
 export type GameStatus = 'waiting' | 'playing' | 'finished';
 
+export interface WordRequest {
+  requestId: string;
+  userId: string;
+  nickname: string;
+  word: string;
+  index: number;
+}
+
 export interface Game {
   id: string;
   hostId: string;
@@ -25,4 +33,5 @@ export interface Game {
   calledWords: string[];
   turn: string | null; // Player ID
   winners: string[]; // Array of nicknames
+  wordRequests: WordRequest[];
 }

@@ -1,7 +1,7 @@
 'use server';
 
 import { Redis } from '@upstash/redis';
-import type { Game, Player } from '@/lib/types';
+import type { Game, Player, WordRequest } from '@/lib/types';
 import { generateRoomCode, checkBingo } from '@/lib/game-utils';
 
 const redis = Redis.fromEnv();
@@ -59,6 +59,7 @@ export async function createRoom({
         calledWords: [],
         turn: null,
         winners: [],
+        wordRequests: [],
     };
 
     await redis.set(gameId, newGame, { ex: GAME_EXPIRATION_SECONDS });
@@ -142,11 +143,11 @@ export async function startGame(gameId: string): Promise<{ game: Game | null, er
         if (!allPlayersReady) {
             return { game, error: "모든 참가자가 준비를 완료해야 시작할 수 있습니다." };
         }
-        if (Object.keys(game.players).length < 1) {
-             return { game, error: "혼자서는 플레이할 수 없습니다." };
+        if (Object.keys(game.players).length < 2) {
+             return { game, error: "최소 2명 이상 참여해야 시작할 수 있습니다." };
         }
 
-        const playerIds = Object.keys(game.players);
+        const playerIds = Object.keys(game.players).filter(id => id !== game.hostId);
         const shuffledPlayerIds = playerIds.sort(() => Math.random() - 0.5);
 
         const updatedGame: Game = {
@@ -205,7 +206,7 @@ export async function callWord(gameId: string, userId: string, word: string): Pr
         if (newWinners.length >= game.endCondition) {
             updates.status = 'finished';
         } else {
-            const playerIds = Object.keys(game.players);
+            const playerIds = Object.keys(game.players).filter(id => id !== game.hostId);
             const currentIndex = playerIds.indexOf(game.turn!);
             const nextIndex = (currentIndex + 1) % playerIds.length;
             updates.turn = playerIds[nextIndex];
@@ -227,6 +228,87 @@ export async function setTurn(gameId: string, playerId: string): Promise<Game | 
         const updatedGame = { ...game, turn: playerId };
         await redis.set(gameId, updatedGame, { ex: GAME_EXPIRATION_SECONDS });
         return updatedGame;
+    } finally {
+        await unlockGame(gameId);
+    }
+}
+
+export async function requestWordApproval(
+    gameId: string, userId: string, word: string, index: number
+): Promise<{game: Game | null, error?: string}> {
+    const game = await getAndLockGame(gameId);
+    if (!game) return { game: null, error: "게임을 찾을 수 없습니다."};
+
+    try {
+        const player = game.players[userId];
+        if (!player) return { game, error: "플레이어를 찾을 수 없습니다." };
+
+        const newRequest: WordRequest = {
+            requestId: `${userId}-${index}`,
+            userId,
+            nickname: player.nickname,
+            word,
+            index,
+        };
+
+        const existingRequests = game.wordRequests || [];
+        if (existingRequests.some(r => r.requestId === newRequest.requestId)) {
+            return { game, error: "이미 해당 단어의 인정을 요청했습니다." };
+        }
+
+        const updatedGame = {
+            ...game,
+            wordRequests: [...existingRequests, newRequest],
+        };
+        await redis.set(gameId, updatedGame, { ex: GAME_EXPIRATION_SECONDS });
+        return { game: updatedGame };
+    } finally {
+        await unlockGame(gameId);
+    }
+}
+
+export async function resolveWordRequest(
+    gameId: string, requestId: string, approve: boolean
+): Promise<Game | null> {
+    const game = await getAndLockGame(gameId);
+    if (!game) return null;
+
+    try {
+        const request = game.wordRequests.find(r => r.requestId === requestId);
+        let updatedGame = { ...game, wordRequests: game.wordRequests.filter(r => r.requestId !== requestId) };
+
+        if (approve && request) {
+            const player = updatedGame.players[request.userId];
+            if (player) {
+                const newMarked = [...player.marked];
+                newMarked[request.index] = true;
+
+                const newBingoCount = checkBingo(newMarked, game.size).length;
+                let newWinners = [...updatedGame.winners];
+
+                updatedGame.players[request.userId] = {
+                    ...player,
+                    marked: newMarked,
+                    bingoCount: newBingoCount,
+                };
+                
+                if (newBingoCount >= game.winCondition && !player.isWinner) {
+                    updatedGame.players[request.userId].isWinner = true;
+                    if (!newWinners.includes(player.nickname)) {
+                        newWinners.push(player.nickname);
+                        updatedGame.winners = newWinners;
+                    }
+                }
+
+                if (newWinners.length >= game.endCondition) {
+                    updatedGame.status = 'finished';
+                }
+            }
+        }
+        
+        await redis.set(gameId, updatedGame, { ex: GAME_EXPIRATION_SECONDS });
+        return updatedGame;
+
     } finally {
         await unlockGame(gameId);
     }
