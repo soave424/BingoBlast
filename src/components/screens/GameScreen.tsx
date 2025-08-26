@@ -30,6 +30,9 @@ export function GameScreen({
     .filter(p => p.id !== game.hostId)
     .sort((a, b) => b.bingoCount - a.bingoCount);
 
+  // For the main display, we want all players except the host.
+  const displayPlayers = Object.values(game.players).filter(p => p.id !== game.hostId);
+
   return (
     <div className="grid lg:grid-cols-3 gap-6">
       <div className="lg:col-span-2 space-y-6">
@@ -50,12 +53,12 @@ export function GameScreen({
           </Card>
         )}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {Object.values(game.players).filter(p => p.id !== game.hostId).map(player => (
+          {displayPlayers.map(player => (
             <Card key={player.id} className={cn("transition-all", game.turn === player.id && "turn-highlight")}>
               <CardHeader className="py-3 px-4">
                 <CardTitle className="text-base flex items-center justify-between">
                   <span className="flex items-center gap-2">
-                    {player.id === game.hostId ? <Crown className="w-4 h-4 text-primary" /> : <User className="w-4 h-4" />}
+                    <User className="w-4 h-4" />
                     {player.nickname}
                   </span>
                   <span className="font-mono text-primary">{player.bingoCount} 빙고</span>
