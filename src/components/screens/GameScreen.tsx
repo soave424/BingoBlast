@@ -68,6 +68,7 @@ export function GameScreen({
                   marked={player.marked}
                   isInteractive={!isHost}
                   isMyTurn={game.turn === player.id}
+                  isHost={isHost}
                   onCellClick={(word) => onCallWord(word)}
                   onRequestApproval={onRequestWordApproval}
                   playerId={player.id}

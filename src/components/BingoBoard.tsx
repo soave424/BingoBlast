@@ -2,6 +2,7 @@
 import type { FC } from 'react';
 import { cn } from '@/lib/utils';
 import { checkBingo } from '@/lib/game-utils';
+import { ShieldQuestion } from 'lucide-react';
 
 interface BingoBoardProps {
   size: number;
@@ -27,9 +28,11 @@ export const BingoBoard: FC<BingoBoardProps> = ({
   isInteractive,
   playerId,
   currentUserId,
+  isHost,
 }) => {
   const bingoLines = checkBingo(marked, size);
   const isMyBoard = playerId === currentUserId;
+  const shouldShowContent = isHost || isMyBoard;
 
   return (
     <div className={cn('relative aspect-square', className)}>
@@ -51,9 +54,12 @@ export const BingoBoard: FC<BingoBoardProps> = ({
           };
 
           const getTitle = () => {
-            if (canCallWord) return `'${word}' 발표하기`;
-            if (canRequestApproval) return `'${word}' 인정 요청하기`;
-            return word;
+            if (shouldShowContent) {
+              if (canCallWord) return `'${word}' 발표하기`;
+              if (canRequestApproval) return `'${word}' 인정 요청하기`;
+              return word;
+            }
+            return '다른 플레이어의 칸';
           }
 
           return (
@@ -69,7 +75,13 @@ export const BingoBoard: FC<BingoBoardProps> = ({
               )}
               title={getTitle()}
             >
-              <span className={cn(isMarked && 'opacity-0')}>{word}</span>
+              {shouldShowContent ? (
+                <span className={cn(isMarked && 'opacity-0')}>{word}</span>
+              ) : (
+                <span className={cn('text-muted-foreground', isMarked && 'opacity-0')}>
+                  <ShieldQuestion className="w-4 h-4" />
+                </span>
+              )}
             </div>
           );
         })}
