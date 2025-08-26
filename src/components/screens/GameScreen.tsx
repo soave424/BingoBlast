@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { BingoBoard } from '@/components/BingoBoard';
 import { cn } from '@/lib/utils';
-import { Crown, User, ChevronsRight } from 'lucide-react';
+import { Crown, User, ChevronsRight, Bot } from 'lucide-react';
 
 interface GameScreenProps {
   game: Game;
@@ -12,9 +12,11 @@ interface GameScreenProps {
   isHost: boolean;
   onCallWord: (word: string) => void;
   onSetTurn: (playerId: string) => void;
+  coachFeedback: string | null;
+  onGetCoachFeedback: () => void;
 }
 
-export function GameScreen({ game, userId, isHost, onCallWord, onSetTurn }: GameScreenProps) {
+export function GameScreen({ game, userId, isHost, onCallWord, onSetTurn, coachFeedback, onGetCoachFeedback }: GameScreenProps) {
   const me = game.players[userId];
   const isMyTurn = game.turn === userId;
   const turnPlayerNickname = game.players[game.turn!]?.nickname || '...';
@@ -105,6 +107,18 @@ export function GameScreen({ game, userId, isHost, onCallWord, onSetTurn }: Game
             </div>
           </CardContent>
         </Card>
+        
+        <div className="space-y-2">
+          <Button onClick={onGetCoachFeedback} className="w-full" disabled={!game.calledWords.length}>
+            <Bot className="mr-2"/> AI 코치에게 조언받기
+          </Button>
+          {coachFeedback && (
+            <div className="relative bg-accent text-accent-foreground p-4 rounded-lg shadow-lg">
+               <div className="absolute bottom-full left-4 w-0 h-0 border-l-8 border-l-transparent border-r-8 border-r-transparent border-b-8 border-b-accent"></div>
+               <p className="text-sm">{coachFeedback}</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

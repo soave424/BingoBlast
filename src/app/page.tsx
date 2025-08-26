@@ -15,6 +15,7 @@ export default function Home() {
   const [game, setGame] = useState<Game | null>(null);
   const [user, setUser] = useState<{ id: string; nickname: string } | null>(null);
   const [isHost, setIsHost] = useState(false);
+  const [coachFeedback, setCoachFeedback] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -144,6 +145,8 @@ export default function Home() {
 
   const handleCallWord = async (word: string) => {
     if (!game || !user || game.turn !== user.id || !word) return;
+    
+    setCoachFeedback(null); // Clear previous feedback
 
     const updates: Partial<Game> = {
       calledWords: [...game.calledWords, word],
@@ -190,23 +193,36 @@ export default function Home() {
     }
     
     setGame(prev => ({...prev!, ...updates}));
+  };
 
-    // AI Feedback
-    const currentPlayer = game.players[user.id];
+  const handleGetCoachFeedback = async () => {
+    if (!game || !user) return;
+
+    // Get feedback for the player whose turn just ended.
+    const playerIds = Object.keys(game.players);
+    const prevTurnIndex = (playerIds.indexOf(game.turn!) - 1 + playerIds.length) % playerIds.length;
+    const prevPlayerId = playerIds[prevTurnIndex];
+    const prevPlayer = game.players[prevPlayerId];
+    const calledWord = game.calledWords[game.calledWords.length - 1];
+
+    if (!prevPlayer || !calledWord) {
+      setCoachFeedback("피드백을 생성할 정보가 부족해요.");
+      return;
+    }
+
+    setCoachFeedback("코칭 메시지를 생성하는 중...");
+
     const feedbackInput: FeedbackInput = {
-      playerName: currentPlayer.nickname,
-      bingoCount: currentPlayer.bingoCount,
-      isWinner: currentPlayer.isWinner,
-      calledWord: word,
-      remainingPlayers: Object.keys(game.players).length - newWinners.length,
+      playerName: prevPlayer.nickname,
+      bingoCount: prevPlayer.bingoCount,
+      isWinner: prevPlayer.isWinner,
+      calledWord: calledWord,
+      remainingPlayers: Object.keys(game.players).length - game.winners.length,
       winCondition: game.winCondition,
     };
     
     const feedbackMessage = await generateFeedback(feedbackInput);
-    toast({
-      title: "AI 코치",
-      description: feedbackMessage,
-    });
+    setCoachFeedback(feedbackMessage);
   };
 
   const handleSetTurn = (playerId: string) => {
@@ -217,6 +233,7 @@ export default function Home() {
   const handleBackToHome = () => {
     setGame(null);
     setIsHost(false);
+    setCoachFeedback(null);
     setUser(prev => ({...prev!, nickname: ''}));
   }
 
@@ -228,7 +245,15 @@ export default function Home() {
       case 'waiting':
         return <WaitingScreen game={game} userId={user!.id} isHost={isHost} onSubmitBoard={handleSubmitBoard} onStartGame={handleStartGame} />;
       case 'playing':
-        return <GameScreen game={game} userId={user!.id} isHost={isHost} onCallWord={handleCallWord} onSetTurn={handleSetTurn} />;
+        return <GameScreen 
+                  game={game} 
+                  userId={user!.id} 
+                  isHost={isHost} 
+                  onCallWord={handleCallWord} 
+                  onSetTurn={handleSetTurn}
+                  coachFeedback={coachFeedback}
+                  onGetCoachFeedback={handleGetCoachFeedback} 
+                />;
       case 'finished':
         return <ResultScreen game={game} onBackToHome={handleBackToHome} />;
       default:

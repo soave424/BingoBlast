@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { Logo } from '@/components/icons/Logo';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useToast } from '@/hooks/use-toast';
 
 interface HomeScreenProps {
   onCreateRoom: (
@@ -33,6 +34,7 @@ export function HomeScreen({ onCreateRoom, onJoinRoom }: HomeScreenProps) {
   const [roomCode, setRoomCode] = useState('');
   const [nickname, setNickname] = useState('');
   const [error, setError] = useState('');
+  const { toast } = useToast();
 
   const handleCreate = () => {
     if (!topic) {
@@ -40,7 +42,27 @@ export function HomeScreen({ onCreateRoom, onJoinRoom }: HomeScreenProps) {
       return;
     }
     setError('');
-    const randomWords = randomWordsList.split(/[\n,]/).map(w => w.trim()).filter(Boolean);
+
+    let randomWords: string[] = [];
+    const rangeRegex = /^(\d+)-(\d+)$/;
+    const rangeMatch = randomWordsList.match(rangeRegex);
+
+    if (rangeMatch) {
+      const start = parseInt(rangeMatch[1], 10);
+      const end = parseInt(rangeMatch[2], 10);
+      if (start < end) {
+        for (let i = start; i <= end; i++) {
+          randomWords.push(i.toString());
+        }
+        toast({
+            title: "랜덤 단어 목록",
+            description: `${start}부터 ${end}까지의 숫자로 빙고판을 채웁니다.`
+        })
+      }
+    } else {
+        randomWords = randomWordsList.split(/[\n,]/).map(w => w.trim()).filter(Boolean);
+    }
+    
     onCreateRoom(topic, size, winCondition, endCondition, enableRandomFill, randomWords);
   };
 
@@ -99,8 +121,8 @@ export function HomeScreen({ onCreateRoom, onJoinRoom }: HomeScreenProps) {
               </div>
               {enableRandomFill && (
                 <div className="space-y-2">
-                    <Label htmlFor="random-words-list">랜덤 단어 목록 (쉼표/줄바꿈 구분)</Label>
-                    <Textarea id="random-words-list" value={randomWordsList} onChange={e => setRandomWordsList(e.target.value)} placeholder="입력하지 않으면 주제에 맞는 샘플 단어가 사용됩니다." />
+                    <Label htmlFor="random-words-list">랜덤 단어 목록 (쉼표/줄바꿈 또는 '1-25' 형식)</Label>
+                    <Textarea id="random-words-list" value={randomWordsList} onChange={e => setRandomWordsList(e.target.value)} placeholder="예: 사과, 바나나, 딸기 또는 1-25" />
                 </div>
               )}
               <Button onClick={handleCreate} className="w-full bg-primary hover:bg-primary/90">생성하기</Button>
