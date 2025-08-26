@@ -19,6 +19,7 @@ interface WaitingScreenProps {
 
 function PlayerSetup({ game, onSubmitBoard }: { game: Game; onSubmitBoard: (board: string[]) => void }) {
   const [board, setBoard] = useState<string[]>(Array(game.size * game.size).fill(''));
+  const { toast } = useToast();
 
   const handleInputChange = (index: number, value: string) => {
     const newBoard = [...board];
@@ -38,9 +39,25 @@ function PlayerSetup({ game, onSubmitBoard }: { game: Game; onSubmitBoard: (boar
 
   const handleSubmit = () => {
     if (board.some(cell => cell.trim() === '')) {
-      alert('빙고판의 모든 칸을 채워주세요.');
+      toast({
+        variant: "destructive",
+        title: "오류",
+        description: "빙고판의 모든 칸을 채워주세요.",
+      });
       return;
     }
+
+    const trimmedBoard = board.map(cell => cell.trim()).filter(Boolean);
+    const uniqueWords = new Set(trimmedBoard);
+    if (uniqueWords.size !== trimmedBoard.length) {
+      toast({
+        variant: "destructive",
+        title: "오류",
+        description: "빙고판에 중복된 단어가 있습니다. 다시 작성해주세요.",
+      });
+      return;
+    }
+
     onSubmitBoard(board);
   };
   
