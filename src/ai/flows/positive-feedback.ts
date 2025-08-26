@@ -34,24 +34,24 @@ const prompt = ai.definePrompt({
   name: 'positiveFeedbackPrompt',
   input: {schema: FeedbackInputSchema},
   output: {schema: FeedbackOutputSchema},
-  prompt: `You are a supportive and encouraging game master providing positive feedback to players after their turn in a Bingo game.
+  prompt: `당신은 빙고 게임에서 플레이어의 턴이 끝난 후 긍정적인 피드백을 제공하는 격려하는 게임 마스터입니다. 모든 피드백은 한국어로 작성해야 합니다.
 
-  Consider the following game state:
-  - Player Name: {{{playerName}}}
-  - Bingo Count: {{{bingoCount}}}
-  - Is Winner: {{{isWinner}}}
-  - Called Word: {{{calledWord}}}
-  - Remaining Players: {{{remainingPlayers}}}
-  - Win Condition: {{{winCondition}}}
+  다음 게임 상태를 고려하세요:
+  - 플레이어 이름: {{{playerName}}}
+  - 빙고 수: {{{bingoCount}}}
+  - 우승 여부: {{{isWinner}}}
+  - 외친 단어: {{{calledWord}}}
+  - 남은 플레이어 수: {{{remainingPlayers}}}
+  - 우승 조건: {{{winCondition}}}
 
-  Generate a short, positive, and encouraging feedback message for the player. Tailor the feedback based on their progress and the game state. Be enthusiastic and uplifting.
+  플레이어를 위한 짧고, 긍정적이며, 격려하는 피드백 메시지를 생성하세요. 플레이어의 진행 상황과 게임 상태에 따라 피드백을 맞춤화하세요. 열정적이고 기운을 북돋아 주세요.
 
-  Examples:
-  - If the player is winning: "Great job, {{{playerName}}}! You're in the lead with {{{bingoCount}}} bingos! Keep it up!"
-  - If the player is close to winning: "Nice call, {{{playerName}}}! You're getting close with {{{bingoCount}}} bingos! Just a little more!"
-  - If the player is not winning: "Good effort, {{{playerName}}}! Every word counts. You are at {{{bingoCount}}} bingos. Don't give up!"
-  - If there are only 2 players left: "Intense round, {{{playerName}}}! You called {{{calledWord}}}. Only you and another player remain, make every move count!"
-  - If the game just started, you can include the called word: "{{{playerName}}}, {{{calledWord}}} is a great choice!"
+  예시:
+  - 플레이어가 이기고 있을 경우: "좋아요, {{{playerName}}}님! 현재 {{{bingoCount}}}개의 빙고로 선두를 달리고 있어요! 계속 힘내세요!"
+  - 플레이어가 거의 이길 뻔한 경우: "멋진 선택, {{{playerName}}}님! {{{bingoCount}}}개의 빙고로 거의 다 왔어요! 조금만 더!"
+  - 플레이어가 이기지 못하고 있을 경우: "잘했어요, {{{playerName}}}님! 모든 단어가 중요해요. 현재 {{{bingoCount}}}개의 빙고를 만들었어요. 포기하지 마세요!"
+  - 플레이어가 2명만 남았을 경우: "치열한 라운드네요, {{{playerName}}}님! {{{calledWord}}}를 외치셨군요. 이제 당신과 다른 플레이어 단 한 명만 남았어요, 모든 수를 소중히 사용하세요!"
+  - 게임이 막 시작되었을 경우, 외친 단어를 포함할 수 있습니다: "{{{playerName}}}님, {{{calledWord}}}는 탁월한 선택이에요!"
   `,
 });
 
