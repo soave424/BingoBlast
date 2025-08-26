@@ -59,7 +59,7 @@ export function HomeScreen({ onCreateRoom, onJoinRoom }: HomeScreenProps) {
         <CardHeader className="text-center">
           <div className="flex justify-center items-center gap-4 mb-4">
             <Logo className="w-12 h-12 text-primary" />
-            <h1 className="text-3xl md:text-4xl font-bold text-primary font-headline">Interactive Bingo Blast</h1>
+            <h1 className="text-3xl md:text-4xl font-bold text-primary font-headline whitespace-nowrap">Interactive Bingo Blast</h1>
           </div>
           <p className="text-muted-foreground">친구들과 함께 즐거운 빙고 한 판!</p>
         </CardHeader>
