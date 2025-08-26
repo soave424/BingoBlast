@@ -74,8 +74,6 @@ export default function Home() {
     randomWords: string[]
   ) => {
     const hostId = userId;
-    // For hosts, let's use a fixed nickname or one they can set. Here, '호스트' is used.
-    // In a real app, you might have a nickname input for the host too.
     const hostNickname = '호스트'; 
     
     const newGame = await createRoom({
@@ -152,7 +150,7 @@ export default function Home() {
     if (!game || !userId) return;
 
     // Get feedback for the player whose turn just ended.
-    const playerIds = Object.keys(game.players).filter(id => id !== game.hostId);
+    const playerIds = Object.keys(game.players);
     let prevPlayerId = game.turn!;
     if (game.calledWords.length > 0) {
         const currentIndex = playerIds.indexOf(game.turn!);
@@ -174,7 +172,7 @@ export default function Home() {
       bingoCount: prevPlayer.bingoCount,
       isWinner: prevPlayer.isWinner,
       calledWord: calledWord,
-      remainingPlayers: Object.keys(game.players).length - 1 - game.winners.length,
+      remainingPlayers: Object.keys(game.players).length - game.winners.length,
       winCondition: game.winCondition,
     };
     

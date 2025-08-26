@@ -27,11 +27,7 @@ export function GameScreen({
   const turnPlayerNickname = game.players[game.turn!]?.nickname || '...';
   
   const sortedPlayers = Object.values(game.players)
-    .filter(p => p.id !== game.hostId)
     .sort((a, b) => b.bingoCount - a.bingoCount);
-
-  // For the main display, we want all players except the host.
-  const displayPlayers = Object.values(game.players).filter(p => p.id !== game.hostId);
 
   return (
     <div className="grid lg:grid-cols-3 gap-6">
@@ -40,7 +36,7 @@ export function GameScreen({
           <Card className="bg-primary/10 border-primary">
             <CardHeader>
               <CardTitle className="text-primary">당신 차례입니다!</CardTitle>
-              <CardDescription>내 빙고판에서 발표할 단어를 선택하세요. 다른 사람이 이미 발표한 단어일 수 있습니다.</CardDescription>
+              <CardDescription>내 빙고판에서 발표할 단어를 선택하세요.</CardDescription>
             </CardHeader>
           </Card>
         )}
@@ -53,12 +49,12 @@ export function GameScreen({
           </Card>
         )}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {displayPlayers.map(player => (
+          {sortedPlayers.map(player => (
             <Card key={player.id} className={cn("transition-all", game.turn === player.id && "turn-highlight")}>
               <CardHeader className="py-3 px-4">
                 <CardTitle className="text-base flex items-center justify-between">
                   <span className="flex items-center gap-2">
-                    <User className="w-4 h-4" />
+                    {player.id === game.hostId ? <Crown className="w-4 h-4 text-amber-500" /> : <User className="w-4 h-4" />}
                     {player.nickname}
                   </span>
                   <span className="font-mono text-primary">{player.bingoCount} 빙고</span>
@@ -69,8 +65,8 @@ export function GameScreen({
                   size={game.size}
                   board={player.board}
                   marked={player.marked}
-                  isInteractive={!isHost}
-                  isMyTurn={game.turn === player.id}
+                  isInteractive={true}
+                  isMyTurn={game.turn === userId}
                   isHost={isHost}
                   onCellClick={(word, index) => onCallWord(word)}
                   onRequestApproval={onRequestWordApproval}
@@ -101,7 +97,7 @@ export function GameScreen({
                 )}
               >
                 <div className="flex items-center gap-2 font-semibold">
-                  <User className="w-5 h-5" />
+                  {player.id === game.hostId ? <Crown className="w-5 h-5 text-amber-500" /> : <User className="w-5 h-5" />}
                   <span>{player.nickname}</span>
                   {player.isWinner && <span title="우승자">🏆</span>}
                 </div>

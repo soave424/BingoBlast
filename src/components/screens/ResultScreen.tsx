@@ -2,7 +2,7 @@
 import type { Game, Player } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Trophy } from 'lucide-react';
+import { Trophy, Crown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ResultScreenProps {
@@ -12,7 +12,6 @@ interface ResultScreenProps {
 
 export function ResultScreen({ game, onBackToHome }: ResultScreenProps) {
   const sortedPlayers = Object.values(game.players)
-    .filter(p => p.id !== game.hostId)
     .sort((a, b) => {
       if (b.bingoCount !== a.bingoCount) {
         return b.bingoCount - a.bingoCount;
@@ -51,7 +50,10 @@ export function ResultScreen({ game, onBackToHome }: ResultScreenProps) {
               <div key={player.id} className={cn("p-4 rounded-lg flex items-center justify-between", rank.bg)}>
                 <div className="flex items-center gap-3">
                   <span className="text-xl font-bold w-12">{rank.icon} {index > 2 && rank.text}</span>
-                  <span className="text-lg font-medium">{player.nickname}</span>
+                   <span className="text-lg font-medium flex items-center gap-2">
+                    {player.id === game.hostId && <Crown className="w-5 h-5 text-amber-500" />}
+                    {player.nickname}
+                  </span>
                 </div>
                 <span className="text-lg font-semibold">{player.bingoCount} 빙고</span>
               </div>

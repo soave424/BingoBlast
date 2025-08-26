@@ -139,7 +139,7 @@ export async function startGame(gameId: string): Promise<{ game: Game | null, er
     if (!game) return { game: null, error: "게임 정보를 찾을 수 없습니다."};
 
     try {
-        const allPlayersReady = Object.values(game.players).filter(p => p.id !== game.hostId).every(p => p.isReady);
+        const allPlayersReady = Object.values(game.players).every(p => p.isReady);
         if (!allPlayersReady) {
             return { game, error: "모든 참가자가 준비를 완료해야 시작할 수 있습니다." };
         }
@@ -147,7 +147,7 @@ export async function startGame(gameId: string): Promise<{ game: Game | null, er
              return { game, error: "최소 2명 이상 참여해야 시작할 수 있습니다." };
         }
 
-        const playerIds = Object.keys(game.players).filter(id => id !== game.hostId);
+        const playerIds = Object.keys(game.players);
         const shuffledPlayerIds = playerIds.sort(() => Math.random() - 0.5);
 
         const updatedGame: Game = {
@@ -212,7 +212,7 @@ export async function callWord(gameId: string, userId: string, word: string): Pr
         if (newWinners.length >= game.endCondition) {
             updates.status = 'finished';
         } else {
-            const playerIds = Object.keys(game.players).filter(id => id !== game.hostId);
+            const playerIds = Object.keys(game.players);
             const currentIndex = playerIds.indexOf(game.turn!);
             const nextIndex = (currentIndex + 1) % playerIds.length;
             updates.turn = playerIds[nextIndex];
