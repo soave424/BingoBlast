@@ -189,11 +189,17 @@ export async function callWord(gameId: string, userId: string, word: string): Pr
             });
 
             if (changed) {
+                const prevBingoCount = player.bingoCount;
                 const newBingoCount = checkBingo(newMarked, game.size).length;
+                
                 updates.players![pid] = { ...player, marked: newMarked, bingoCount: newBingoCount };
+                
+                if (newBingoCount > prevBingoCount) {
+                    updates.players![pid]!.lastBingoTimestamp = Date.now();
+                }
 
                 if (newBingoCount >= game.winCondition && !player.isWinner) {
-                    updates.players![pid] = { ...updates.players![pid], isWinner: true };
+                    updates.players![pid]!.isWinner = true;
                     if (!newWinners.includes(player.nickname)) {
                         newWinners.push(player.nickname);
                     }
@@ -282,7 +288,8 @@ export async function resolveWordRequest(
             if (player) {
                 const newMarked = [...player.marked];
                 newMarked[request.index] = true;
-
+                
+                const prevBingoCount = player.bingoCount;
                 const newBingoCount = checkBingo(newMarked, game.size).length;
                 let newWinners = [...updatedGame.winners];
 
@@ -292,6 +299,10 @@ export async function resolveWordRequest(
                     bingoCount: newBingoCount,
                 };
                 
+                if (newBingoCount > prevBingoCount) {
+                    updatedGame.players[request.userId].lastBingoTimestamp = Date.now();
+                }
+
                 if (newBingoCount >= game.winCondition && !player.isWinner) {
                     updatedGame.players[request.userId].isWinner = true;
                     if (!newWinners.includes(player.nickname)) {

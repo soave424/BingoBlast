@@ -6,6 +6,7 @@ export interface Player {
   marked: boolean[];
   bingoCount: number;
   isWinner: boolean;
+  lastBingoTimestamp?: number; // 마지막 빙고 달성 시간
 }
 
 export type GameStatus = 'waiting' | 'playing' | 'finished';

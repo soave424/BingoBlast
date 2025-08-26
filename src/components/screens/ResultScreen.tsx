@@ -1,5 +1,5 @@
 'use client';
-import type { Game } from '@/lib/types';
+import type { Game, Player } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Trophy } from 'lucide-react';
@@ -11,7 +11,21 @@ interface ResultScreenProps {
 }
 
 export function ResultScreen({ game, onBackToHome }: ResultScreenProps) {
-  const sortedPlayers = Object.values(game.players).sort((a, b) => b.bingoCount - a.bingoCount);
+  const sortedPlayers = Object.values(game.players)
+    .filter(p => p.id !== game.hostId)
+    .sort((a, b) => {
+      if (b.bingoCount !== a.bingoCount) {
+        return b.bingoCount - a.bingoCount;
+      }
+      // 빙고 수가 같으면, 마지막 빙고 달성 시간이 더 빠른 사람이 높은 순위
+      // lastBingoTimestamp가 없는 경우 (빙고 0개)는 나중에 정렬
+      if (a.lastBingoTimestamp && b.lastBingoTimestamp) {
+        return a.lastBingoTimestamp - b.lastBingoTimestamp;
+      }
+      if (a.lastBingoTimestamp) return -1; // a는 빙고가 있고, b는 없음
+      if (b.lastBingoTimestamp) return 1; // b는 빙고가 있고, a는 없음
+      return 0; // 둘 다 빙고 없음
+  });
   
   const getRankContent = (index: number) => {
     switch (index) {
