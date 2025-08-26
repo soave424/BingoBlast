@@ -169,7 +169,7 @@ export async function callWord(gameId: string, userId: string, word: string): Pr
     if (!game || game.turn !== userId || !word) return game;
 
     try {
-        const updates: Partial<Game> = {
+        const updates: Partial<Game> & { players: Record<string, Player> } = {
             calledWords: [...game.calledWords, word],
             players: { ...game.players },
         };
@@ -192,14 +192,14 @@ export async function callWord(gameId: string, userId: string, word: string): Pr
                 const prevBingoCount = player.bingoCount;
                 const newBingoCount = checkBingo(newMarked, game.size).length;
                 
-                updates.players![pid] = { ...player, marked: newMarked, bingoCount: newBingoCount };
+                updates.players[pid] = { ...player, marked: newMarked, bingoCount: newBingoCount };
                 
                 if (newBingoCount > prevBingoCount) {
-                    updates.players![pid]!.lastBingoTimestamp = Date.now();
+                    updates.players[pid].lastBingoTimestamp = Date.now();
                 }
 
                 if (newBingoCount >= game.winCondition && !player.isWinner) {
-                    updates.players![pid]!.isWinner = true;
+                    updates.players[pid].isWinner = true;
                     if (!newWinners.includes(player.nickname)) {
                         newWinners.push(player.nickname);
                     }
@@ -218,7 +218,7 @@ export async function callWord(gameId: string, userId: string, word: string): Pr
             updates.turn = playerIds[nextIndex];
         }
 
-        const updatedGame = { ...game, ...updates };
+        const updatedGame: Game = { ...game, ...updates };
         await redis.set(gameId, updatedGame, { ex: GAME_EXPIRATION_SECONDS });
         return updatedGame;
     } finally {
@@ -281,40 +281,58 @@ export async function resolveWordRequest(
 
     try {
         const request = game.wordRequests.find(r => r.requestId === requestId);
-        let updatedGame = { ...game, wordRequests: game.wordRequests.filter(r => r.requestId !== requestId) };
+        let updatedGame: Game = { ...game, wordRequests: game.wordRequests.filter(r => r.requestId !== requestId) };
 
         if (approve && request) {
-            const player = updatedGame.players[request.userId];
-            if (player) {
+             const wordToApprove = request.word;
+            const updates: Partial<Game> & { players: Record<string, Player> } = {
+                players: { ...updatedGame.players },
+            };
+            let newWinners = [...updatedGame.winners];
+            
+            // Mark the word for all players
+            for (const pid of Object.keys(updatedGame.players)) {
+                const player = updatedGame.players[pid];
                 const newMarked = [...player.marked];
-                newMarked[request.index] = true;
-                
-                const prevBingoCount = player.bingoCount;
-                const newBingoCount = checkBingo(newMarked, game.size).length;
-                let newWinners = [...updatedGame.winners];
+                let changed = false;
 
-                updatedGame.players[request.userId] = {
-                    ...player,
-                    marked: newMarked,
-                    bingoCount: newBingoCount,
-                };
-                
-                if (newBingoCount > prevBingoCount) {
-                    updatedGame.players[request.userId].lastBingoTimestamp = Date.now();
-                }
+                player.board.forEach((cellWord, index) => {
+                    if (cellWord.trim().toLowerCase() === wordToApprove.trim().toLowerCase()) {
+                        if (!newMarked[index]) {
+                            newMarked[index] = true;
+                            changed = true;
+                        }
+                    }
+                });
 
-                if (newBingoCount >= game.winCondition && !player.isWinner) {
-                    updatedGame.players[request.userId].isWinner = true;
-                    if (!newWinners.includes(player.nickname)) {
-                        newWinners.push(player.nickname);
-                        updatedGame.winners = newWinners;
+                if (changed) {
+                    const prevBingoCount = player.bingoCount;
+                    const newBingoCount = checkBingo(newMarked, updatedGame.size).length;
+
+                    updates.players[pid] = { ...player, marked: newMarked, bingoCount: newBingoCount };
+
+                    if (newBingoCount > prevBingoCount) {
+                        updates.players[pid].lastBingoTimestamp = Date.now();
+                    }
+
+                    if (newBingoCount >= updatedGame.winCondition && !player.isWinner) {
+                        updates.players[pid].isWinner = true;
+                        if (!newWinners.includes(player.nickname)) {
+                            newWinners.push(player.nickname);
+                        }
                     }
                 }
-
-                if (newWinners.length >= game.endCondition) {
-                    updatedGame.status = 'finished';
-                }
             }
+            
+            updates.winners = newWinners;
+
+            if (newWinners.length >= updatedGame.endCondition) {
+                updates.status = 'finished';
+            }
+
+            // Apply all updates to the game state
+            updatedGame = { ...updatedGame, ...updates };
+
         }
         
         await redis.set(gameId, updatedGame, { ex: GAME_EXPIRATION_SECONDS });
