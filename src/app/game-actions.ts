@@ -1,9 +1,10 @@
 'use server';
 
-import { kv } from '@vercel/kv';
+import { Redis } from '@upstash/redis';
 import type { Game, Player } from '@/lib/types';
 import { generateRoomCode, checkBingo } from '@/lib/game-utils';
 
+const redis = Redis.fromEnv();
 const GAME_EXPIRATION_SECONDS = 60 * 60 * 2; // 2 hours
 
 // Helper to get and lock a game
@@ -11,18 +12,18 @@ async function getAndLockGame(gameId: string): Promise<Game | null> {
     // NOTE: This is a simplified lock for demonstration.
     // In a high-concurrency production environment, you'd want a more robust distributed lock.
     const lockKey = `lock:${gameId}`;
-    const locked = await kv.set(lockKey, 'locked', { nx: true, ex: 5 }); // Lock for 5 seconds
+    const locked = await redis.set(lockKey, 'locked', { nx: true, ex: 5 }); // Lock for 5 seconds
     if (!locked) {
         // Could wait and retry, but for this app, we'll just fail fast.
         console.warn(`Game ${gameId} is currently locked.`);
         return null;
     }
-    return kv.get(gameId);
+    return redis.get(gameId);
 }
 
 // Helper to unlock a game
 async function unlockGame(gameId: string) {
-    await kv.del(`lock:${gameId}`);
+    await redis.del(`lock:${gameId}`);
 }
 
 
@@ -60,13 +61,13 @@ export async function createRoom({
         winners: [],
     };
 
-    await kv.set(gameId, newGame, { ex: GAME_EXPIRATION_SECONDS });
+    await redis.set(gameId, newGame, { ex: GAME_EXPIRATION_SECONDS });
     return newGame;
 }
 
 export async function joinRoom(roomCode: string, userId: string, nickname: string): Promise<{ game: Game | null, error?: string }> {
     const gameId = `game:${roomCode.toUpperCase()}`;
-    const game: Game | null = await kv.get(gameId);
+    const game: Game | null = await redis.get(gameId);
 
     if (!game) {
         return { game: null, error: "방을 찾을 수 없습니다." };
@@ -101,12 +102,12 @@ export async function joinRoom(roomCode: string, userId: string, nickname: strin
             [userId]: newPlayer,
         }
     };
-    await kv.set(gameId, updatedGame, { ex: GAME_EXPIRATION_SECONDS });
+    await redis.set(gameId, updatedGame, { ex: GAME_EXPIRATION_SECONDS });
     return { game: updatedGame };
 }
 
 export async function getGame(gameId: string): Promise<Game | null> {
-    return kv.get(gameId);
+    return redis.get(gameId);
 }
 
 export async function submitBoard(gameId: string, userId: string, board: string[]): Promise<Game | null> {
@@ -125,7 +126,7 @@ export async function submitBoard(gameId: string, userId: string, board: string[
             },
         };
         const updatedGame = { ...game, players: updatedPlayers };
-        await kv.set(gameId, updatedGame, { ex: GAME_EXPIRATION_SECONDS });
+        await redis.set(gameId, updatedGame, { ex: GAME_EXPIRATION_SECONDS });
         return updatedGame;
     } finally {
         await unlockGame(gameId);
@@ -154,7 +155,7 @@ export async function startGame(gameId: string): Promise<{ game: Game | null, er
             turn: shuffledPlayerIds[0],
         };
 
-        await kv.set(gameId, updatedGame, { ex: GAME_EXPIRATION_SECONDS });
+        await redis.set(gameId, updatedGame, { ex: GAME_EXPIRATION_SECONDS });
         return { game: updatedGame };
     } finally {
         await unlockGame(gameId);
@@ -211,7 +212,7 @@ export async function callWord(gameId: string, userId: string, word: string): Pr
         }
 
         const updatedGame = { ...game, ...updates };
-        await kv.set(gameId, updatedGame, { ex: GAME_EXPIRATION_SECONDS });
+        await redis.set(gameId, updatedGame, { ex: GAME_EXPIRATION_SECONDS });
         return updatedGame;
     } finally {
         await unlockGame(gameId);
@@ -224,7 +225,7 @@ export async function setTurn(gameId: string, playerId: string): Promise<Game | 
 
     try {
         const updatedGame = { ...game, turn: playerId };
-        await kv.set(gameId, updatedGame, { ex: GAME_EXPIRATION_SECONDS });
+        await redis.set(gameId, updatedGame, { ex: GAME_EXPIRATION_SECONDS });
         return updatedGame;
     } finally {
         await unlockGame(gameId);
