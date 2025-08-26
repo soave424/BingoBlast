@@ -1,29 +1,68 @@
 'use client';
 
 import type { Game, Player, GameStatus } from '@/lib/types';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { HomeScreen } from '@/components/screens/HomeScreen';
 import { WaitingScreen } from '@/components/screens/WaitingScreen';
 import { GameScreen } from '@/components/screens/GameScreen';
 import { ResultScreen } from '@/components/screens/ResultScreen';
-import { generateRoomCode, checkBingo } from '@/lib/game-utils';
 import { useToast } from '@/hooks/use-toast';
 import { generateFeedback } from '@/app/actions';
 import type { FeedbackInput } from '@/ai/flows/positive-feedback';
+import { createRoom, joinRoom, getGame, submitBoard, startGame, callWord, setTurn } from '@/app/game-actions';
+
+// Generate a unique session ID for the user
+const getSessionId = () => {
+  if (typeof window !== 'undefined') {
+    let sessionId = sessionStorage.getItem('bingoSessionId');
+    if (!sessionId) {
+      sessionId = `user_${Math.random().toString(36).substr(2, 9)}`;
+      sessionStorage.setItem('bingoSessionId', sessionId);
+    }
+    return sessionId;
+  }
+  return `server_user_${Math.random().toString(36).substr(2, 9)}`;
+};
 
 export default function Home() {
   const [game, setGame] = useState<Game | null>(null);
-  const [user, setUser] = useState<{ id: string; nickname: string } | null>(null);
-  const [isHost, setIsHost] = useState(false);
+  const [userId, setUserId] = useState<string>('');
   const [coachFeedback, setCoachFeedback] = useState<string | null>(null);
+  const [isHost, setIsHost] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
-    // Simulate user authentication on component mount
-    setUser({ id: `user_${Math.random().toString(36).substr(2, 9)}`, nickname: '' });
+    setUserId(getSessionId());
   }, []);
+  
+  const handleGameUpdate = useCallback((newGame: Game | null) => {
+    if (newGame) {
+      setGame(newGame);
+    } else {
+      setGame(null);
+       toast({
+        variant: "destructive",
+        title: "오류",
+        description: "게임 정보를 불러오는 데 실패했습니다.",
+      });
+    }
+  }, [toast]);
 
-  const handleCreateRoom = (
+  // Polling for game updates
+  useEffect(() => {
+    if (!game?.id) return;
+    
+    const interval = setInterval(async () => {
+      const updatedGame = await getGame(game.id);
+      if (JSON.stringify(updatedGame) !== JSON.stringify(game)) {
+        setGame(updatedGame);
+      }
+    }, 2000); // Poll every 2 seconds
+
+    return () => clearInterval(interval);
+  }, [game]);
+  
+  const handleCreateRoom = async (
     topic: string,
     size: number,
     winCondition: number,
@@ -31,183 +70,91 @@ export default function Home() {
     isRandomFillEnabled: boolean,
     randomWords: string[]
   ) => {
-    if (!user) return;
-    const hostId = user.id;
+    const hostId = userId;
     const hostNickname = '호스트';
-    setIsHost(true);
-    setUser(prev => ({...prev!, nickname: hostNickname}));
-
-    const newGame: Game = {
-      id: `game_${Math.random().toString(36).substr(2, 9)}`,
+    
+    const newGame = await createRoom({
       hostId,
-      roomCode: generateRoomCode(),
+      hostNickname,
       topic,
       size,
       winCondition,
       endCondition,
       isRandomFillEnabled,
-      randomWords,
-      status: 'waiting',
-      players: {
-        [hostId]: {
-          id: hostId,
-          nickname: hostNickname,
-          isReady: false, // Host also needs to submit a board
-          board: [],
-          marked: [],
-          bingoCount: 0,
-          isWinner: false,
-        },
-      },
-      calledWords: [],
-      turn: null,
-      winners: [],
-    };
-    setGame(newGame);
+      randomWords
+    });
+
+    if (newGame) {
+      setIsHost(true);
+      handleGameUpdate(newGame);
+    } else {
+      toast({ variant: 'destructive', title: '오류', description: '방을 만들지 못했습니다.'});
+    }
   };
 
-  const handleJoinRoom = (roomCode: string, nickname: string) => {
-    if (!user || !game) {
-       toast({
-        variant: "destructive",
-        title: "오류",
-        description: "참여할 수 있는 방이 없습니다. 호스트가 먼저 방을 만들어야 합니다.",
-      });
-      return;
-    }
-     if (game.roomCode.toLowerCase() !== roomCode.toLowerCase()) {
-      toast({
-        variant: "destructive",
-        title: "오류",
-        description: "방 코드가 일치하지 않습니다.",
-      });
-      return;
-    }
+  const handleJoinRoom = async (roomCode: string, nickname: string) => {
+    if (!userId) return;
 
-    setIsHost(false);
-    setUser(prev => ({...prev!, nickname}));
-
-    setGame(prevGame => {
-      if (!prevGame) return null;
-      const newPlayer: Player = {
-        id: user.id,
-        nickname,
-        isReady: false,
-        board: [],
-        marked: [],
-        bingoCount: 0,
-        isWinner: false,
-      };
-      return {
-        ...prevGame,
-        players: {
-          ...prevGame.players,
-          [user.id]: newPlayer,
+    const updatedGame = await joinRoom(roomCode, userId, nickname);
+    if(updatedGame) {
+        if(updatedGame.error) {
+             toast({ variant: "destructive", title: "오류", description: updatedGame.error });
+        } else {
+            setIsHost(false);
+            handleGameUpdate(updatedGame.game);
         }
-      };
-    });
+    } else {
+        toast({ variant: "destructive", title: "오류", description: "방에 참여할 수 없습니다." });
+    }
   };
 
-  const handleSubmitBoard = (board: string[]) => {
-    if (!game || !user) return;
-    const marked = Array(game.size * game.size).fill(false);
-    setGame(prevGame => {
-      if (!prevGame) return null;
-      const updatedPlayers = {
-        ...prevGame.players,
-        [user.id]: {
-          ...prevGame.players[user.id],
-          board,
-          marked,
-          isReady: true,
-        },
-      };
-      return { ...prevGame, players: updatedPlayers };
-    });
-  };
-
-  const handleStartGame = () => {
-    if (!game || !isHost) return;
-    const allPlayersReady = Object.values(game.players).every(p => p.isReady);
-    if (!allPlayersReady) {
+  const handleSubmitBoard = async (board: string[]) => {
+    if (!game || !userId) return;
+    
+    const uniqueWords = new Set(board.map(cell => cell.trim()));
+    if (uniqueWords.size !== board.length) {
       toast({
         variant: "destructive",
         title: "오류",
-        description: "모든 참가자가 준비를 완료해야 시작할 수 있습니다.",
+        description: "빙고판에 중복된 단어가 있습니다. 다시 작성해주세요.",
       });
       return;
     }
-    
-    // Shuffle players to determine turn order, including the host
-    const playerIds = Object.keys(game.players);
-    const shuffledPlayerIds = playerIds.sort(() => Math.random() - 0.5);
 
-    setGame(prevGame => ({
-      ...prevGame!,
-      status: 'playing',
-      turn: shuffledPlayerIds[0],
-    }));
+    const updatedGame = await submitBoard(game.id, userId, board);
+    handleGameUpdate(updatedGame);
+  };
+
+  const handleStartGame = async () => {
+    if (!game || !isHost) return;
+    
+    const result = await startGame(game.id);
+    if (result.error) {
+       toast({ variant: "destructive", title: "오류", description: result.error });
+    } else {
+      handleGameUpdate(result.game);
+    }
   };
 
   const handleCallWord = async (word: string) => {
-    if (!game || !user || game.turn !== user.id || !word) return;
+    if (!game || !userId || game.turn !== userId || !word) return;
     
     setCoachFeedback(null); // Clear previous feedback
-
-    const updates: Partial<Game> = {
-      calledWords: [...game.calledWords, word],
-      players: { ...game.players },
-    };
-    let newWinners = [...game.winners];
-
-    for (const pid of Object.keys(game.players)) {
-      const player = game.players[pid];
-      const newMarked = [...player.marked];
-      let changed = false;
-      player.board.forEach((cellWord, index) => {
-        if (cellWord.trim().toLowerCase() === word.trim().toLowerCase()) {
-          if (!newMarked[index]) {
-            newMarked[index] = true;
-            changed = true;
-          }
-        }
-      });
-
-      if (changed) {
-        const newBingoCount = checkBingo(newMarked, game.size).length;
-        updates.players![pid] = { ...player, marked: newMarked, bingoCount: newBingoCount };
-
-        if (newBingoCount >= game.winCondition && !player.isWinner) {
-          updates.players![pid] = { ...updates.players![pid], isWinner: true };
-          if(!newWinners.includes(player.nickname)) {
-            newWinners.push(player.nickname);
-          }
-        }
-      }
-    }
-    
-    updates.winners = newWinners;
-
-    if (newWinners.length >= game.endCondition) {
-      updates.status = 'finished';
-    } else {
-        // Determine next turn
-        const playerIds = Object.keys(game.players);
-        const currentIndex = playerIds.indexOf(game.turn!);
-        const nextIndex = (currentIndex + 1) % playerIds.length;
-        updates.turn = playerIds[nextIndex];
-    }
-    
-    setGame(prev => ({...prev!, ...updates}));
+    const updatedGame = await callWord(game.id, userId, word);
+    handleGameUpdate(updatedGame);
   };
 
   const handleGetCoachFeedback = async () => {
-    if (!game || !user) return;
+    if (!game || !userId) return;
 
     // Get feedback for the player whose turn just ended.
     const playerIds = Object.keys(game.players);
-    const prevTurnIndex = (playerIds.indexOf(game.turn!) - 1 + playerIds.length) % playerIds.length;
-    const prevPlayerId = playerIds[prevTurnIndex];
+    let prevPlayerId = game.turn!;
+    if (game.calledWords.length > 0) {
+        const currentIndex = playerIds.indexOf(game.turn!);
+        const prevTurnIndex = (currentIndex - 1 + playerIds.length) % playerIds.length;
+        prevPlayerId = playerIds[prevTurnIndex];
+    }
     const prevPlayer = game.players[prevPlayerId];
     const calledWord = game.calledWords[game.calledWords.length - 1];
 
@@ -231,16 +178,20 @@ export default function Home() {
     setCoachFeedback(feedbackMessage);
   };
 
-  const handleSetTurn = (playerId: string) => {
+  const handleSetTurn = async (playerId: string) => {
     if(!game || !isHost) return;
-    setGame(prev => ({...prev!, turn: playerId}));
+    const updatedGame = await setTurn(game.id, playerId);
+    handleGameUpdate(updatedGame);
   }
 
   const handleBackToHome = () => {
     setGame(null);
     setIsHost(false);
     setCoachFeedback(null);
-    setUser(prev => ({...prev!, nickname: ''}));
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('bingoSessionId');
+      setUserId(getSessionId());
+    }
   }
 
   const renderScreen = () => {
@@ -249,11 +200,11 @@ export default function Home() {
     }
     switch (game.status) {
       case 'waiting':
-        return <WaitingScreen game={game} userId={user!.id} isHost={isHost} onSubmitBoard={handleSubmitBoard} onStartGame={handleStartGame} />;
+        return <WaitingScreen game={game} userId={userId} isHost={isHost} onSubmitBoard={handleSubmitBoard} onStartGame={handleStartGame} />;
       case 'playing':
         return <GameScreen 
                   game={game} 
-                  userId={user!.id} 
+                  userId={userId} 
                   isHost={isHost} 
                   onCallWord={handleCallWord} 
                   onSetTurn={handleSetTurn}

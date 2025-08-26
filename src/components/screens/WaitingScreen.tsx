@@ -17,9 +17,11 @@ interface WaitingScreenProps {
   onStartGame: () => void;
 }
 
-function PlayerSetup({ game, onSubmitBoard }: { game: Game; onSubmitBoard: (board: string[]) => void }) {
+function PlayerSetup({ game, userId, onSubmitBoard }: { game: Game; userId: string, onSubmitBoard: (board: string[]) => void }) {
   const [board, setBoard] = useState<string[]>(Array(game.size * game.size).fill(''));
   const { toast } = useToast();
+  
+  const me = game.players[userId];
 
   const handleInputChange = (index: number, value: string) => {
     const newBoard = [...board];
@@ -47,9 +49,9 @@ function PlayerSetup({ game, onSubmitBoard }: { game: Game; onSubmitBoard: (boar
       return;
     }
 
-    const trimmedBoard = board.map(cell => cell.trim()).filter(Boolean);
+    const trimmedBoard = board.map(cell => cell.trim().toLowerCase());
     const uniqueWords = new Set(trimmedBoard);
-    if (uniqueWords.size !== trimmedBoard.length) {
+    if (uniqueWords.size !== board.filter(c => c.trim() !== '').length) {
       toast({
         variant: "destructive",
         title: "오류",
@@ -61,6 +63,20 @@ function PlayerSetup({ game, onSubmitBoard }: { game: Game; onSubmitBoard: (boar
     onSubmitBoard(board);
   };
   
+   if (me?.isReady) {
+      return (
+        <Card>
+          <CardHeader>
+            <CardTitle>준비 완료!</CardTitle>
+            <CardDescription>다른 플레이어들을 기다리고 있습니다.</CardDescription>
+          </CardHeader>
+          <CardContent>
+              <BingoBoard size={game.size} board={me.board} marked={me.marked} isInteractive={false} />
+          </CardContent>
+        </Card>
+      );
+   }
+
   return (
     <Card>
       <CardHeader>
@@ -132,19 +148,7 @@ export function WaitingScreen({ game, userId, isHost, onSubmitBoard, onStartGame
         </Card>
         
         <div className="md:col-span-2 space-y-4">
-          {!me.isReady ? (
-            <PlayerSetup game={game} onSubmitBoard={onSubmitBoard} />
-          ) : (
-            <Card>
-              <CardHeader>
-                <CardTitle>준비 완료!</CardTitle>
-                <CardDescription>다른 플레이어들을 기다리고 있습니다.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                  <BingoBoard size={game.size} board={me.board} marked={me.marked} isInteractive={false} />
-              </CardContent>
-            </Card>
-          )}
+           <PlayerSetup game={game} userId={userId} onSubmitBoard={onSubmitBoard} />
 
           {isHost && (
             <Card>
