@@ -139,7 +139,7 @@ export async function startGame(gameId: string): Promise<{ game: Game | null, er
     if (!game) return { game: null, error: "게임 정보를 찾을 수 없습니다."};
 
     try {
-        const allPlayersReady = Object.values(game.players).every(p => p.isReady);
+        const allPlayersReady = Object.values(game.players).filter(p => p.id !== game.hostId).every(p => p.isReady);
         if (!allPlayersReady) {
             return { game, error: "모든 참가자가 준비를 완료해야 시작할 수 있습니다." };
         }

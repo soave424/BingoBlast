@@ -22,6 +22,7 @@ export const BingoBoard: FC<BingoBoardProps> = ({
   size,
   board,
   marked,
+  isMyTurn,
   onCellClick,
   onRequestApproval,
   className,
@@ -42,7 +43,9 @@ export const BingoBoard: FC<BingoBoardProps> = ({
       >
         {board.map((word, i) => {
           const isMarked = marked[i];
-          const canCallWord = isInteractive && isMyBoard && !isMarked && onCellClick;
+          // My board, my turn, cell is not marked, onCellClick is provided
+          const canCallWord = isInteractive && isMyBoard && isMyTurn && !isMarked && onCellClick;
+          // My board, not my turn, cell is not marked, onRequestApproval is provided
           const canRequestApproval = isInteractive && isMyBoard && !isMyTurn && !isMarked && onRequestApproval;
           
           const handleClick = () => {

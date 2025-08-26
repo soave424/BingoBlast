@@ -69,7 +69,7 @@ export function GameScreen({
                   isInteractive={!isHost}
                   isMyTurn={game.turn === player.id}
                   isHost={isHost}
-                  onCellClick={(word) => onCallWord(word)}
+                  onCellClick={(word, index) => onCallWord(word)}
                   onRequestApproval={onRequestWordApproval}
                   playerId={player.id}
                   currentUserId={userId}
