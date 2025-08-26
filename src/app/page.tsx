@@ -67,39 +67,45 @@ export default function Home() {
   };
 
   const handleJoinRoom = (roomCode: string, nickname: string) => {
-    if (!user) return;
-    // In a real app, you'd fetch the game data from a server.
-    // For this simulation, we'll assume a game object exists and we can join it.
-    // This part is mostly for show in this single-player simulation.
-    toast({
-      title: "참여 기능",
-      description: "실제 앱에서는 이 코드로 방에 참여합니다. 현재는 시뮬레이션입니다.",
-    });
-
-    // For demonstration, let's create a dummy game to join.
-    const dummyGame: Game = {
-      id: `game_${Math.random().toString(36).substr(2, 9)}`,
-      hostId: 'dummy_host',
-      roomCode: roomCode,
-      topic: '시뮬레이션',
-      size: 5,
-      winCondition: 1,
-      endCondition: 1,
-      isRandomFillEnabled: true,
-      randomWords: '가,나,다,라,마,바,사,아,자,차,카,타,파,하,거,너,더,러,머,버,서,어,저,처,커'.split(','),
-      status: 'waiting',
-      players: {
-        'dummy_host': { id: 'dummy_host', nickname: '호스트', isReady: true, board: Array(25).fill(''), marked: Array(25).fill(false), bingoCount: 0, isWinner: false },
-        [user.id]: { id: user.id, nickname: nickname, isReady: false, board: [], marked: [], bingoCount: 0, isWinner: false },
-      },
-      calledWords: [],
-      turn: null,
-      winners: [],
+    if (!user || !game) {
+       toast({
+        variant: "destructive",
+        title: "오류",
+        description: "참여할 수 있는 방이 없습니다. 호스트가 먼저 방을 만들어야 합니다.",
+      });
+      return;
+    }
+     if (game.roomCode.toLowerCase() !== roomCode.toLowerCase()) {
+      toast({
+        variant: "destructive",
+        title: "오류",
+        description: "방 코드가 일치하지 않습니다.",
+      });
+      return;
     }
 
     setIsHost(false);
     setUser(prev => ({...prev!, nickname}));
-    setGame(dummyGame);
+
+    setGame(prevGame => {
+      if (!prevGame) return null;
+      const newPlayer: Player = {
+        id: user.id,
+        nickname,
+        isReady: false,
+        board: [],
+        marked: [],
+        bingoCount: 0,
+        isWinner: false,
+      };
+      return {
+        ...prevGame,
+        players: {
+          ...prevGame.players,
+          [user.id]: newPlayer,
+        }
+      };
+    });
   };
 
   const handleSubmitBoard = (board: string[]) => {
